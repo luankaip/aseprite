@@ -28,18 +28,31 @@ jobs:
     # 仅在 Windows GUI 构建中安装 OpenSSL 构建依赖
     - name: Install OpenSSL build dependencies
       if: ${{ runner.os == 'Windows' && matrix.ui == 'gui' }}
-      shell: bash
+      shell: powershell
       run: |
-        choco install -y --no-progress strawberryperl || echo "StrawberryPerl might be already installed, continuing..."
-        choco install -y --no-progress nasm || echo "nasm might be already installed, continuing..."
-        # 获取 NASM 安装路径并添加到 PATH
-        nasm_path=$(ls "C:\Program Files\NASM" | grep -m1 'nasm-')
-        echo "NASM_PATH=C:\\Program Files\\NASM\\$nasm_path" >> $GITHUB_ENV
-        echo "C:\\Program Files\\NASM\\$nasm_path" >> $GITHUB_PATH
-        # 添加 Strawberry Perl 到 PATH
-        echo "C:\\Strawberry\\perl\\bin" >> $GITHUB_PATH
-        # 验证 NASM 安装
-        echo "验证 NASM 安装:"
+        # 安装 Strawberry Perl - 使用更可靠的安装方式
+        if (-not (Test-Path "C:\Strawberry\perl\bin\perl.exe")) {
+          choco install -y --no-progress strawberryperl
+        } else {
+          Write-Host "Strawberry Perl already installed"
+        }
+        # 安装 NASM - 同样检查是否已安装
+        if (-not (Test-Path "C:\Program Files\NASM\nasm.exe")) {
+          choco install -y --no-progress nasm
+        } else {
+          Write-Host "NASM already installed"
+        }
+        # 添加路径到环境变量
+        $perlPath = "C:\Strawberry\perl\bin"
+        $nasmPath = (Get-ChildItem "C:\Program Files\NASM" -Filter "nasm-*" | Select-Object -First 1).FullName
+        Write-Host "Adding Perl path: $perlPath"
+        Write-Host "Adding NASM path: $nasmPath"
+        Add-Content -Path $env:GITHUB_PATH -Value $perlPath
+        Add-Content -Path $env:GITHUB_PATH -Value $nasmPath
+        # 设置 NASM 路径环境变量
+        Write-Host "NASM_PATH=$nasmPath" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+        # 验证安装
+        perl -v
         nasm -v
     # 构建静态 OpenSSL
     - name: Build static OpenSSL
