@@ -108,7 +108,8 @@ jobs:
     - name: Build static Skia
       if: ${{ runner.os == 'Windows' && matrix.ui == 'gui' }}
       shell: bash
-      run: |        git clone https://github.com/google/skia.git
+      run: |
+        git clone https://github.com/google/skia.git
         cd skia
         
         # 安装必要的依赖
