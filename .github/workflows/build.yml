@@ -108,22 +108,21 @@ jobs:
     - name: Build static Skia
       if: ${{ runner.os == 'Windows' && matrix.ui == 'gui' }}
       shell: bash
-      run: |
-        git clone https://github.com/google/skia.git
+      run: |        git clone https://github.com/google/skia.git
         cd skia
+        
         # 安装必要的依赖
         python tools/git-sync-deps
         
-        # 修复: 确保 libpng 可用
-        if [[ ! -f "third_party/externals/libpng/png.h" ]]; then
-          echo "警告: libpng 头文件缺失，尝试修复..."
-          pushd third_party/externals
-          git clone https://github.com/glennrp/libpng.git
-          mv libpng libpng-fix
-          cp -r libpng-fix/* ../libpng/
-          rm -rf libpng-fix
-          popd
-        fi
+        # 完全修复 libpng 问题
+        pushd third_party/externals
+        rm -rf libpng
+        git clone https://github.com/glennrp/libpng.git
+        popd
+        
+        # 确保 libpng 头文件在正确位置
+        mkdir -p third_party/externals/libpng
+        cp -r third_party/externals/libpng/* third_party/externals/libpng/
         
         # 更新 GN 配置参数
         bin/gn gen out/Static --args='
@@ -132,19 +131,16 @@ jobs:
             target_cpu="x64"
             skia_use_openssl=true
             skia_use_system_openssl=true
-            extra_cflags=["/MT"]
+            extra_cflags=["/MT", "-I../../third_party/externals/libpng"]
             extra_ldflags=["/NODEFAULTLIB:LIBCMT"]
             skia_enable_tools=false
             skia_enable_pdf=false
             skia_enable_gpu=false
-            skia_use_libpng=true  # 确保启用 libpng
+            skia_use_libpng=true
         '
         
-        # 添加 libpng 包含路径到构建系统
-        echo "include_dirs = [ \"//third_party/externals/libpng\" ]" >> out/Static/args.gn
-        
-        # 重新生成 ninja 文件
-        bin/gn gen out/Static
+        # 手动添加包含路径到构建文件
+        sed -i 's/\/wd5030/\/wd5030 -I..\/..\/third_party\/externals\/libpng/' out/Static/toolchain.ninja
         
         ninja -C out/Static
         
