@@ -87,25 +87,36 @@ jobs:
     # 构建静态 OpenSSL
     - name: Build static OpenSSL
       if: ${{ runner.os == 'Windows' && matrix.ui == 'gui' }}
-      shell: bash
+      shell: powershell
       run: |
+        # 创建构建目录
         mkdir openssl-build
         cd openssl-build
+        
         # 下载 OpenSSL 源代码
-        OPENSSL_VERSION="1.1.1w"
-        curl -L -o openssl.tar.gz "https://www.openssl.org/source/openssl-$OPENSSL_VERSION.tar.gz"
+        $OPENSSL_VERSION = "1.1.1w"
+        $OPENSSL_URL = "https://www.openssl.org/source/openssl-$OPENSSL_VERSION.tar.gz"
+        curl -L -o openssl.tar.gz $OPENSSL_URL
+        
+        # 解压源代码
         tar -xzf openssl.tar.gz --strip-components=1
-        # 确保 NASM 在 PATH 中
-        echo "当前 PATH: $PATH"
-        echo "验证 NASM 可用性:"
-        which nasm || echo "NASM not found!"
+        
+        # 验证 NASM 可用性
+        Write-Host "验证 NASM 可用性:"
         nasm -v
-        # 配置为静态库
-        perl Configure VC-WIN64A no-shared --prefix="$PWD/install" -MT
+        
+        # 使用 Windows 原生路径运行配置
+        Write-Host "运行 OpenSSL 配置..."
+        perl Configure VC-WIN64A no-shared --prefix="$pwd\install" -MT
+        
+        # 构建并安装
         nmake
         nmake install
-        # 设置环境变量供后续步骤使用
-        echo "OPENSSL_ROOT_DIR=$(pwd)/install" >> $GITHUB_ENV
+        
+        # 设置环境变量
+        $installPath = (Resolve-Path .).Path + "\install"
+        Write-Host "OPENSSL_ROOT_DIR=$installPath" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+        Write-Host "OpenSSL 已安装在: $installPath"
     # 构建静态 Skia
     - name: Build static Skia
       if: ${{ runner.os == 'Windows' && matrix.ui == 'gui' }}
