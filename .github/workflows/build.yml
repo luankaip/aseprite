@@ -93,13 +93,18 @@ jobs:
         mkdir openssl-build
         cd openssl-build
         
-        # 下载 OpenSSL 源代码
+        # 下载 OpenSSL 源代码 - 使用 Invoke-WebRequest 替代 curl
         $OPENSSL_VERSION = "1.1.1w"
         $OPENSSL_URL = "https://www.openssl.org/source/openssl-$OPENSSL_VERSION.tar.gz"
-        curl -L -o openssl.tar.gz $OPENSSL_URL
+        Write-Host "正在下载 OpenSSL $OPENSSL_VERSION..."
+        Invoke-WebRequest -Uri $OPENSSL_URL -OutFile openssl.tar.gz -MaximumRedirection 5
         
-        # 解压源代码
-        tar -xzf openssl.tar.gz --strip-components=1
+        # 解压源代码 - 使用 7zip 替代 tar
+        Write-Host "解压 OpenSSL 源代码..."
+        & "$env:ProgramFiles\7-Zip\7z.exe" x openssl.tar.gz
+        & "$env:ProgramFiles\7-Zip\7z.exe" x openssl.tar -o.
+        Move-Item -Path "openssl-$OPENSSL_VERSION\*" -Destination . -Force
+        Remove-Item -Path "openssl-$OPENSSL_VERSION" -Recurse -Force
         
         # 验证 NASM 可用性
         Write-Host "验证 NASM 可用性:"
