@@ -111,9 +111,21 @@ jobs:
       run: |
         git clone https://github.com/google/skia.git
         cd skia
-        # 同步依赖
+        # 安装必要的依赖
         python tools/git-sync-deps
-        # 配置 GN 构建参数 - 静态链接 OpenSSL
+        
+        # 修复: 确保 libpng 可用
+        if [[ ! -f "third_party/externals/libpng/png.h" ]]; then
+          echo "警告: libpng 头文件缺失，尝试修复..."
+          pushd third_party/externals
+          git clone https://github.com/glennrp/libpng.git
+          mv libpng libpng-fix
+          cp -r libpng-fix/* ../libpng/
+          rm -rf libpng-fix
+          popd
+        fi
+        
+        # 更新 GN 配置参数
         bin/gn gen out/Static --args='
             is_official_build=true
             is_debug=false
@@ -125,10 +137,17 @@ jobs:
             skia_enable_tools=false
             skia_enable_pdf=false
             skia_enable_gpu=false
+            skia_use_libpng=true  # 确保启用 libpng
         '
-        # 构建 Skia
+        
+        # 添加 libpng 包含路径到构建系统
+        echo "include_dirs = [ \"//third_party/externals/libpng\" ]" >> out/Static/args.gn
+        
+        # 重新生成 ninja 文件
+        bin/gn gen out/Static
+        
         ninja -C out/Static
-        # 设置环境变量供后续步骤使用
+        
         echo "SKIA_BUILD_DIR=$(pwd)/out/Static" >> $GITHUB_ENV
     - name: Install Dependencies
       if: runner.os == 'Linux'
