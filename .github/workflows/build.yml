@@ -84,58 +84,16 @@ jobs:
         
         # 验证 Perl
         perl -v
-    # 构建静态 OpenSSL
-    - name: Build static OpenSSL
+    # 替代方案：使用预编译的 OpenSSL
+    - name: Download prebuilt OpenSSL
       if: ${{ runner.os == 'Windows' && matrix.ui == 'gui' }}
       shell: powershell
       run: |
-        # 创建构建目录
-        mkdir openssl-build
-        cd openssl-build
-        
-        # 下载 OpenSSL 源代码
-        $OPENSSL_VERSION = "1.1.1w"
-        $OPENSSL_URL = "https://www.openssl.org/source/openssl-$OPENSSL_VERSION.tar.gz"
-        Write-Host "正在下载 OpenSSL $OPENSSL_VERSION..."
-        Invoke-WebRequest -Uri $OPENSSL_URL -OutFile openssl.tar.gz -MaximumRedirection 5
-        
-        # 解压源代码 - 使用 7zip
-        Write-Host "解压 OpenSSL 源代码..."
-        # 第一步：解压 gzip
+        $url = "https://github.com/ShiftMediaProject/openssl/releases/download/1_1_1w/openssl-1.1.1w-msvc-x64-static-md.tar.gz"
+        Invoke-WebRequest -Uri $url -OutFile openssl.tar.gz
         & "$env:ProgramFiles\7-Zip\7z.exe" x openssl.tar.gz
-        # 第二步：解压 tar 文件（注意 -o 参数后有空格）
-        & "$env:ProgramFiles\7-Zip\7z.exe" x openssl.tar -o .
-        
-        # 查找并重命名解压后的目录
-        $opensslDir = Get-ChildItem -Directory | Where-Object { $_.Name -like "openssl-*" } | Select-Object -First 1
-        if ($null -eq $opensslDir) {
-            Write-Host "错误：未找到 openssl 目录"
-            Get-ChildItem -Recurse | Format-Table
-            exit 1
-        }
-        
-        Write-Host "找到 OpenSSL 目录: $($opensslDir.Name)"
-        # 移动所有文件到当前目录
-        Get-ChildItem -Path $opensslDir.FullName | Move-Item -Destination . -Force
-        # 删除空目录
-        Remove-Item -Path $opensslDir.FullName -Recurse -Force
-        
-        # 验证 NASM 可用性
-        Write-Host "验证 NASM 可用性:"
-        nasm -v
-        
-        # 使用 Windows 原生路径运行配置
-        Write-Host "运行 OpenSSL 配置..."
-        perl Configure VC-WIN64A no-shared --prefix="$pwd\install" -MT
-        
-        # 构建并安装
-        nmake
-        nmake install
-        
-        # 设置环境变量
-        $installPath = (Resolve-Path .).Path + "\install"
-        Write-Host "OPENSSL_ROOT_DIR=$installPath" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-        Write-Host "OpenSSL 已安装在: $installPath"
+        & "$env:ProgramFiles\7-Zip\7z.exe" x openssl.tar -o openssl
+        echo "OPENSSL_ROOT_DIR=$pwd\openssl" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
     # 构建静态 Skia
     - name: Build static Skia
       if: ${{ runner.os == 'Windows' && matrix.ui == 'gui' }}
