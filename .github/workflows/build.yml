@@ -1,151 +1,31 @@
-name: build
-on: [push, pull_request, workflow_dispatch]
+name: build # 工作流名称
+on: [push, workflow_dispatch] # 代码推送到仓库时触发或手动触发
 jobs:
   build:
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        # 旧配置 全版本编译
         # os: [windows-latest, macos-latest, ubuntu-latest]
         # build_type: [RelWithDebInfo, Debug]
         # ui: [gui, cli]
         # scripting: [lua, noscripts]
-        os: [windows-latest]
-        build_type: [RelWithDebInfo]
-        ui: [gui]
-        scripting: [lua]
-        exclude:
-          - build_type: Debug
-            ui: gui
-          - build_type: RelWithDebInfo
-            ui: cli
-          - build_type: RelWithDebInfo
-            scripting: noscripts
+        # exclude:
+        #   - build_type: Debug
+        #     ui: gui
+        #   - build_type: RelWithDebInfo
+        #     ui: cli
+        #   - build_type: RelWithDebInfo
+        #     scripting: noscripts
+        os: [windows-latest]  # 仅编译windows版本
+        build_type: [Release] # 仅编译发布版本
+        ui: [gui]             # 仅编译图形用户界面版本
+        scripting: [lua]      # 仅编译启用Lua脚本支持版本
     steps:
     - uses: actions/checkout@v4
       with:
         submodules: 'recursive'
-    # 仅在 Windows GUI 构建中安装 OpenSSL 构建依赖
-    - name: Install OpenSSL build dependencies
-      if: ${{ runner.os == 'Windows' && matrix.ui == 'gui' }}
-      shell: powershell
-      run: |
-        # 安装 Strawberry Perl - 仅在未安装时执行
-        if (-not (Test-Path "C:\Strawberry\perl\bin\perl.exe")) {
-          choco install -y --no-progress strawberryperl
-        } else {
-          Write-Host "Strawberry Perl already installed"
-        }
-        
-        # 安装 NASM - 仅在未安装时执行
-        if (-not (Test-Path "C:\Program Files\NASM\nasm.exe")) {
-          choco install -y --no-progress nasm
-        } else {
-          Write-Host "NASM already installed"
-        }
-        
-        # 添加 Perl 路径到环境变量
-        $perlPath = "C:\Strawberry\perl\bin"
-        Write-Host "Adding Perl path: $perlPath"
-        Add-Content -Path $env:GITHUB_PATH -Value $perlPath
-        
-        # 直接查找 NASM 可执行文件路径
-        $nasmPath = $null
-        # 检查默认安装路径
-        if (Test-Path "C:\Program Files\NASM\nasm.exe") {
-          $nasmPath = "C:\Program Files\NASM"
-        }
-        # 如果未找到，尝试在 Chocolatey 安装目录查找
-        if (-not $nasmPath) {
-          $chocoPath = "C:\ProgramData\chocolatey\lib\nasm\tools"
-          if (Test-Path "$chocoPath\nasm.exe") {
-            $nasmPath = $chocoPath
-          }
-        }
-        # 如果仍未找到，尝试搜索整个系统
-        if (-not $nasmPath) {
-          $nasmExe = Get-Command nasm -ErrorAction SilentlyContinue
-          if ($nasmExe) {
-            $nasmPath = (Get-Item $nasmExe.Path).Directory.FullName
-          }
-        }
-        
-        if ($nasmPath) {
-          Write-Host "Found NASM at: $nasmPath"
-          Add-Content -Path $env:GITHUB_PATH -Value $nasmPath
-          Write-Host "NASM_PATH=$nasmPath" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-          
-          # 验证 NASM
-          & "$nasmPath\nasm.exe" -v
-        } else {
-          Write-Host "ERROR: NASM not found!"
-          exit 1
-        }
-        
-        # 验证 Perl
-        perl -v
-    # 替代方案：使用预编译的 OpenSSL
-    - name: Download prebuilt OpenSSL
-      if: ${{ runner.os == 'Windows' && matrix.ui == 'gui' }}
-      shell: powershell
-      run: |
-        # 使用官方 OpenSSL Windows 二进制分发
-        $url = "https://slproweb.com/download/Win64OpenSSL-1_1_1w.msi"
-        $installerPath = "$env:TEMP\Win64OpenSSL.msi"
-        Invoke-WebRequest -Uri $url -OutFile $installerPath
-        
-        # 静默安装
-        Start-Process msiexec -ArgumentList "/i `"$installerPath`" /quiet /qn" -Wait
-        
-        # 设置环境变量
-        $installPath = "C:\Program Files\OpenSSL-Win64"
-        Write-Host "OPENSSL_ROOT_DIR=$installPath" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-        Write-Host "安装 OpenSSL 在: $installPath"
-        
-        # 添加 OpenSSL 到 PATH
-        echo "$installPath\bin" >> $env:GITHUB_PATH
-    # 构建静态 Skia
-    - name: Build static Skia
-      if: ${{ runner.os == 'Windows' && matrix.ui == 'gui' }}
-      shell: bash
-      run: |
-        git clone https://github.com/google/skia.git
-        cd skia
-        
-        # 安装必要的依赖
-        python tools/git-sync-deps
-        
-        # 完全修复 libpng 问题
-        pushd third_party/externals
-        rm -rf libpng
-        git clone https://github.com/glennrp/libpng.git
-        popd
-        
-        # 确保 libpng 头文件在正确位置
-        mkdir -p third_party/externals/libpng
-        cp -r third_party/externals/libpng/* third_party/externals/libpng/
-        
-        # 更新 GN 配置参数
-        bin/gn gen out/Static --args='
-            is_official_build=true
-            is_debug=false
-            target_cpu="x64"
-            skia_use_openssl=true
-            skia_use_system_openssl=true
-            extra_cflags=["/MT", "-I../../third_party/externals/libpng"]
-            extra_ldflags=["/NODEFAULTLIB:LIBCMT"]
-            skia_enable_tools=false
-            skia_enable_pdf=false
-            skia_enable_gpu=false
-            skia_use_libpng=true
-        '
-        
-        # 手动添加包含路径到构建文件
-        sed -i 's/\/wd5030/\/wd5030 -I..\/..\/third_party\/externals\/libpng/' out/Static/toolchain.ninja
-        
-        ninja -C out/Static
-        
-        echo "SKIA_BUILD_DIR=$(pwd)/out/Static" >> $GITHUB_ENV
     - name: Install Dependencies
       if: runner.os == 'Linux'
       shell: bash
@@ -155,7 +35,7 @@ jobs:
           libpixman-1-dev libfreetype6-dev libharfbuzz-dev zlib1g-dev \
           libx11-dev libxcursor-dev libxi-dev libgl1-mesa-dev libfontconfig1-dev
     - name: Install Skia
-      if: ${{ !(runner.os == 'Windows' && matrix.ui == 'gui') && matrix.ui == 'gui' }}
+      if: ${{ matrix.ui == 'gui' }}
       shell: bash
       run: |
         if [[ "${{ runner.os }}" == "Windows" ]] ; then
@@ -202,28 +82,21 @@ jobs:
           export skia_arch=x64
         fi
 
-        # 设置 Skia 路径：Windows GUI 使用自定义构建，其他使用预编译
-        if [[ "${{ runner.os }}" == "Windows" && "${{ matrix.ui }}" == "gui" ]] ; then
-          export SKIA_DIR_PATH="${{ github.workspace }}/skia"
-          export SKIA_LIB_PATH="$SKIA_BUILD_DIR"
-        else
-          export SKIA_DIR_PATH="$(realpath skia)"
-          export SKIA_LIB_PATH="$(realpath skia/out/Release-$skia_arch)"
-        fi
-
         cmake -S . -B build -G Ninja \
           -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
           -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9 \
-          -DENABLE_TESTS=OFF \
+          -DENABLE_TESTS=OFF \ # 不启用测试支持
           -DENABLE_SCRIPTING=$enable_scripting \
           -DENABLE_CCACHE=$enable_ccache \
           -DLAF_BACKEND=$laf_backend \
-          -DSKIA_DIR=$SKIA_DIR_PATH \
-          -DSKIA_LIBRARY_DIR=$SKIA_LIB_PATH
+          -DSKIA_DIR=$(realpath skia) \
+          -DSKIA_LIBRARY_DIR=$(realpath skia/out/Release-$skia_arch) \
+          -DOPENSSL_USE_STATIC_LIBS=ON
     - name: Compiling
       shell: bash
       run: |
         cd build && ninja
+    # 旧配置 用于编译时调试测试
     # - name: Running C++ Tests
     #   shell: bash
     #   run: |
@@ -241,20 +114,10 @@ jobs:
     #     export ASEPRITE=$PWD/build/bin/aseprite
     #     cd tests
     #     $XVFB bash run-tests.sh
-    - name: Verify no OpenSSL DLL dependency
-      if: ${{ runner.os == 'Windows' && matrix.ui == 'gui' }}
-      shell: cmd
-      run: |
-        dumpbin /DEPENDENTS build\bin\aseprite.exe | findstr /i "libcrypto"
-        if %errorlevel% equ 0 (
-          echo Error: Detected OpenSSL DLL dependency!
-          exit 1
-        ) else (
-          echo Success: No OpenSSL DLL dependency found
-        )
+    # 新增配置 提交后直接进行编译
     - uses: actions/upload-artifact@v4
       with:
-        name: aseprite-${{ runner.os }}-${{ matrix.ui }}-${{ matrix.scripting }}-${{ matrix.build_type }}
+        name: aseprite-${{ runner.os }}-${{ matrix.ui }}-${{ matrix.scripting }}-${{ matrix.build_type }} # 编译完成后的文件名称
         path: |
           ${{ github.workspace }}/build/bin/data
-          ${{ github.workspace }}/build/bin/aseprite*
+          ${{ github.workspace }}/build/bin/aseprite.exe
