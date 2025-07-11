@@ -90,7 +90,9 @@ jobs:
           -DLAF_BACKEND=$laf_backend \
           -DSKIA_DIR=$(realpath skia) \
           -DSKIA_LIBRARY_DIR=$(realpath skia/out/Release-$skia_arch)
-        copy "C:/Windows/System32/libcrypto-1_1-x64.dll" ./bin
+        if [[ "${{ runner.os }}" == "Windows" ]] ; then
+          cp "C:/Windows/System32/libcrypto-1_1-x64.dll" ./bin
+        fi
     - name: Compiling
       shell: bash
       run: |
