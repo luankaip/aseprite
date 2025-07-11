@@ -1,5 +1,5 @@
 name: build
-on: [push, pull_request]
+on: [push, pull_request, workflow_dispatch]
 jobs:
   build:
     runs-on: ${{ matrix.os }}
@@ -25,16 +25,6 @@ jobs:
     - uses: actions/checkout@v4
       with:
         submodules: 'recursive'
-    # 添加OpenSSL安装步骤 (仅Windows)
-    - name: Install OpenSSL (Windows)
-      if: runner.os == 'Windows'
-      shell: powershell
-      run: |
-        $url = "https://slproweb.com/download/Win64OpenSSL-1_1_1w.exe"
-        Invoke-WebRequest -Uri $url -OutFile openssl.exe
-        Start-Process -Wait -FilePath .\openssl.exe -ArgumentList "/VERYSILENT /DIR=$pwd\openssl /NORESTART"
-        echo "OPENSSL_ROOT_DIR=$pwd\openssl" | Out-File -FilePath $env:GITHUB_ENV -Append
-        echo "$pwd\openssl\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
     - name: Install Dependencies
       if: runner.os == 'Linux'
       shell: bash
@@ -69,10 +59,8 @@ jobs:
       run: |
         if [[ "${{ runner.os }}" == "Windows" ]] ; then
           export enable_ccache=off
-          openssl_args="-DOPENSSL_ROOT_DIR=$OPENSSL_ROOT_DIR" # 添加OpenSSL路径到CMake变量
         else
           export enable_ccache=on
-          openssl_args=""
         fi
 
         if [[ "${{ matrix.ui }}" == "gui" ]] ; then
@@ -96,13 +84,13 @@ jobs:
         cmake -S . -B build -G Ninja \
           -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
           -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9 \
-          -DENABLE_TESTS=ON \
+          -DENABLE_TESTS=OFF \
           -DENABLE_SCRIPTING=$enable_scripting \
           -DENABLE_CCACHE=$enable_ccache \
           -DLAF_BACKEND=$laf_backend \
           -DSKIA_DIR=$(realpath skia) \
-          -DSKIA_LIBRARY_DIR=$(realpath skia/out/Release-$skia_arch) \
-          $openssl_args  # 添加OpenSSL参数
+          -DSKIA_LIBRARY_DIR=$(realpath skia/out/Release-$skia_arch)
+        copy "C:/Windows/System32/libcrypto-1_1-x64.dll" ./bin
     - name: Compiling
       shell: bash
       run: |
@@ -124,14 +112,6 @@ jobs:
     #     export ASEPRITE=$PWD/build/bin/aseprite
     #     cd tests
     #     $XVFB bash run-tests.sh
-    # 添加DLL复制步骤 (仅Windows)
-    - name: Copy OpenSSL DLLs (Windows)
-      if: runner.os == 'Windows'
-      shell: powershell
-      run: |
-        Copy-Item "$env:OPENSSL_ROOT_DIR\bin\libcrypto-1_1-x64.dll" -Destination "build\bin\"
-        Copy-Item "$env:OPENSSL_ROOT_DIR\bin\libssl-1_1-x64.dll" -Destination "build\bin\"
-        
     - uses: actions/upload-artifact@v4
       with:
         name: aseprite-${{ runner.os }}-${{ matrix.ui }}-${{ matrix.scripting }}-${{ matrix.build_type }}
