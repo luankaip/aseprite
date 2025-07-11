@@ -32,7 +32,15 @@ jobs:
       run: |
         choco install -y --no-progress strawberryperl
         choco install -y --no-progress nasm
+        # 获取 NASM 安装路径并添加到 PATH
+        nasm_path=$(ls "C:\Program Files\NASM" | grep -m1 'nasm-')
+        echo "NASM_PATH=C:\\Program Files\\NASM\\$nasm_path" >> $GITHUB_ENV
+        echo "C:\\Program Files\\NASM\\$nasm_path" >> $GITHUB_PATH
+        # 添加 Strawberry Perl 到 PATH
         echo "C:\\Strawberry\\perl\\bin" >> $GITHUB_PATH
+        # 验证 NASM 安装
+        echo "验证 NASM 安装:"
+        nasm -v
     # 构建静态 OpenSSL
     - name: Build static OpenSSL
       if: ${{ runner.os == 'Windows' && matrix.ui == 'gui' }}
