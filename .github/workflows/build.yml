@@ -93,18 +93,32 @@ jobs:
         mkdir openssl-build
         cd openssl-build
         
-        # 下载 OpenSSL 源代码 - 使用 Invoke-WebRequest 替代 curl
+        # 下载 OpenSSL 源代码
         $OPENSSL_VERSION = "1.1.1w"
         $OPENSSL_URL = "https://www.openssl.org/source/openssl-$OPENSSL_VERSION.tar.gz"
         Write-Host "正在下载 OpenSSL $OPENSSL_VERSION..."
         Invoke-WebRequest -Uri $OPENSSL_URL -OutFile openssl.tar.gz -MaximumRedirection 5
         
-        # 解压源代码 - 使用 7zip 替代 tar
+        # 解压源代码 - 使用 7zip
         Write-Host "解压 OpenSSL 源代码..."
+        # 第一步：解压 gzip
         & "$env:ProgramFiles\7-Zip\7z.exe" x openssl.tar.gz
-        & "$env:ProgramFiles\7-Zip\7z.exe" x openssl.tar -o.
-        Move-Item -Path "openssl-$OPENSSL_VERSION\*" -Destination . -Force
-        Remove-Item -Path "openssl-$OPENSSL_VERSION" -Recurse -Force
+        # 第二步：解压 tar 文件（注意 -o 参数后有空格）
+        & "$env:ProgramFiles\7-Zip\7z.exe" x openssl.tar -o .
+        
+        # 查找并重命名解压后的目录
+        $opensslDir = Get-ChildItem -Directory | Where-Object { $_.Name -like "openssl-*" } | Select-Object -First 1
+        if ($null -eq $opensslDir) {
+            Write-Host "错误：未找到 openssl 目录"
+            Get-ChildItem -Recurse | Format-Table
+            exit 1
+        }
+        
+        Write-Host "找到 OpenSSL 目录: $($opensslDir.Name)"
+        # 移动所有文件到当前目录
+        Get-ChildItem -Path $opensslDir.FullName | Move-Item -Destination . -Force
+        # 删除空目录
+        Remove-Item -Path $opensslDir.FullName -Recurse -Force
         
         # 验证 NASM 可用性
         Write-Host "验证 NASM 可用性:"
