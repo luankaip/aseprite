@@ -89,11 +89,21 @@ jobs:
       if: ${{ runner.os == 'Windows' && matrix.ui == 'gui' }}
       shell: powershell
       run: |
-        $url = "https://github.com/ShiftMediaProject/openssl/releases/download/1_1_1w/openssl-1.1.1w-msvc-x64-static-md.tar.gz"
-        Invoke-WebRequest -Uri $url -OutFile openssl.tar.gz
-        & "$env:ProgramFiles\7-Zip\7z.exe" x openssl.tar.gz
-        & "$env:ProgramFiles\7-Zip\7z.exe" x openssl.tar -o openssl
-        echo "OPENSSL_ROOT_DIR=$pwd\openssl" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+        # 使用官方 OpenSSL Windows 二进制分发
+        $url = "https://slproweb.com/download/Win64OpenSSL-1_1_1w.msi"
+        $installerPath = "$env:TEMP\Win64OpenSSL.msi"
+        Invoke-WebRequest -Uri $url -OutFile $installerPath
+        
+        # 静默安装
+        Start-Process msiexec -ArgumentList "/i `"$installerPath`" /quiet /qn" -Wait
+        
+        # 设置环境变量
+        $installPath = "C:\Program Files\OpenSSL-Win64"
+        Write-Host "OPENSSL_ROOT_DIR=$installPath" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+        Write-Host "安装 OpenSSL 在: $installPath"
+        
+        # 添加 OpenSSL 到 PATH
+        echo "$installPath\bin" >> $env:GITHUB_PATH
     # 构建静态 Skia
     - name: Build static Skia
       if: ${{ runner.os == 'Windows' && matrix.ui == 'gui' }}
