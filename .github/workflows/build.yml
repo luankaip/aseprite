@@ -25,6 +25,55 @@ jobs:
     - uses: actions/checkout@v4
       with:
         submodules: 'recursive'
+    # 仅在 Windows GUI 构建中安装 OpenSSL 构建依赖
+    - name: Install OpenSSL build dependencies
+      if: ${{ runner.os == 'Windows' && matrix.ui == 'gui' }}
+      shell: bash
+      run: |
+        choco install -y --no-progress perl nasm
+    # 构建静态 OpenSSL
+    - name: Build static OpenSSL
+      if: ${{ runner.os == 'Windows' && matrix.ui == 'gui' }}
+      shell: bash
+      run: |
+        mkdir openssl-build
+        cd openssl-build
+        # 下载 OpenSSL 源代码
+        OPENSSL_VERSION="1.1.1w"
+        curl -L -o openssl.tar.gz "https://www.openssl.org/source/openssl-$OPENSSL_VERSION.tar.gz"
+        tar -xzf openssl.tar.gz --strip-components=1
+        # 配置为静态库
+        perl Configure VC-WIN64A no-shared --prefix="$PWD/install" -MT
+        nmake
+        nmake install
+        # 设置环境变量供后续步骤使用
+        echo "OPENSSL_ROOT_DIR=$(pwd)/install" >> $GITHUB_ENV
+    # 构建静态 Skia
+    - name: Build static Skia
+      if: ${{ runner.os == 'Windows' && matrix.ui == 'gui' }}
+      shell: bash
+      run: |
+        git clone https://github.com/google/skia.git
+        cd skia
+        # 同步依赖
+        python tools/git-sync-deps
+        # 配置 GN 构建参数 - 静态链接 OpenSSL
+        bin/gn gen out/Static --args='
+            is_official_build=true
+            is_debug=false
+            target_cpu="x64"
+            skia_use_openssl=true
+            skia_use_system_openssl=true
+            extra_cflags=["/MT"]
+            extra_ldflags=["/NODEFAULTLIB:LIBCMT"]
+            skia_enable_tools=false
+            skia_enable_pdf=false
+            skia_enable_gpu=false
+        '
+        # 构建 Skia
+        ninja -C out/Static
+        # 设置环境变量供后续步骤使用
+        echo "SKIA_BUILD_DIR=$(pwd)/out/Static" >> $GITHUB_ENV
     - name: Install Dependencies
       if: runner.os == 'Linux'
       shell: bash
@@ -34,7 +83,7 @@ jobs:
           libpixman-1-dev libfreetype6-dev libharfbuzz-dev zlib1g-dev \
           libx11-dev libxcursor-dev libxi-dev libgl1-mesa-dev libfontconfig1-dev
     - name: Install Skia
-      if: ${{ matrix.ui == 'gui' }}
+      if: ${{ !(runner.os == 'Windows' && matrix.ui == 'gui') && matrix.ui == 'gui' }}
       shell: bash
       run: |
         if [[ "${{ runner.os }}" == "Windows" ]] ; then
@@ -81,6 +130,15 @@ jobs:
           export skia_arch=x64
         fi
 
+        # 设置 Skia 路径：Windows GUI 使用自定义构建，其他使用预编译
+        if [[ "${{ runner.os }}" == "Windows" && "${{ matrix.ui }}" == "gui" ]] ; then
+          export SKIA_DIR_PATH="${{ github.workspace }}/skia"
+          export SKIA_LIB_PATH="$SKIA_BUILD_DIR"
+        else
+          export SKIA_DIR_PATH="$(realpath skia)"
+          export SKIA_LIB_PATH="$(realpath skia/out/Release-$skia_arch)"
+        fi
+
         cmake -S . -B build -G Ninja \
           -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
           -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9 \
@@ -88,11 +146,8 @@ jobs:
           -DENABLE_SCRIPTING=$enable_scripting \
           -DENABLE_CCACHE=$enable_ccache \
           -DLAF_BACKEND=$laf_backend \
-          -DSKIA_DIR=$(realpath skia) \
-          -DSKIA_LIBRARY_DIR=$(realpath skia/out/Release-$skia_arch)
-        if [[ "${{ runner.os }}" == "Windows" ]] ; then
-          cp "C:/Windows/System32/libcrypto-1_1-x64.dll" ./bin
-        fi
+          -DSKIA_DIR=$SKIA_DIR_PATH \
+          -DSKIA_LIBRARY_DIR=$SKIA_LIB_PATH
     - name: Compiling
       shell: bash
       run: |
@@ -120,3 +175,14 @@ jobs:
         path: |
           ${{ github.workspace }}/build/bin/data
           ${{ github.workspace }}/build/bin/aseprite*
+    - name: Verify no OpenSSL DLL dependency
+      if: ${{ runner.os == 'Windows' && matrix.ui == 'gui' }}
+      shell: cmd
+      run: |
+        dumpbin /DEPENDENTS build\bin\aseprite.exe | findstr /i "libcrypto"
+        if %errorlevel% equ 0 (
+          echo Error: Detected OpenSSL DLL dependency!
+          exit 1
+        ) else (
+          echo Success: No OpenSSL DLL dependency found
+        )
