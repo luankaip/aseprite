@@ -30,8 +30,8 @@ jobs:
       if: ${{ runner.os == 'Windows' && matrix.ui == 'gui' }}
       shell: bash
       run: |
-        choco install -y --no-progress strawberryperl
-        choco install -y --no-progress nasm
+        choco install -y --no-progress strawberryperl || echo "StrawberryPerl might be already installed, continuing..."
+        choco install -y --no-progress nasm || echo "nasm might be already installed, continuing..."
         # 获取 NASM 安装路径并添加到 PATH
         nasm_path=$(ls "C:\Program Files\NASM" | grep -m1 'nasm-')
         echo "NASM_PATH=C:\\Program Files\\NASM\\$nasm_path" >> $GITHUB_ENV
