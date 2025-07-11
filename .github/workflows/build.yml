@@ -30,7 +30,9 @@ jobs:
       if: ${{ runner.os == 'Windows' && matrix.ui == 'gui' }}
       shell: bash
       run: |
-        choco install -y --no-progress perl nasm
+        choco install -y --no-progress strawberryperl
+        choco install -y --no-progress nasm
+        echo "C:\\Strawberry\\perl\\bin" >> $GITHUB_PATH
     # 构建静态 OpenSSL
     - name: Build static OpenSSL
       if: ${{ runner.os == 'Windows' && matrix.ui == 'gui' }}
@@ -169,12 +171,6 @@ jobs:
     #     export ASEPRITE=$PWD/build/bin/aseprite
     #     cd tests
     #     $XVFB bash run-tests.sh
-    - uses: actions/upload-artifact@v4
-      with:
-        name: aseprite-${{ runner.os }}-${{ matrix.ui }}-${{ matrix.scripting }}-${{ matrix.build_type }}
-        path: |
-          ${{ github.workspace }}/build/bin/data
-          ${{ github.workspace }}/build/bin/aseprite*
     - name: Verify no OpenSSL DLL dependency
       if: ${{ runner.os == 'Windows' && matrix.ui == 'gui' }}
       shell: cmd
@@ -186,3 +182,9 @@ jobs:
         ) else (
           echo Success: No OpenSSL DLL dependency found
         )
+    - uses: actions/upload-artifact@v4
+      with:
+        name: aseprite-${{ runner.os }}-${{ matrix.ui }}-${{ matrix.scripting }}-${{ matrix.build_type }}
+        path: |
+          ${{ github.workspace }}/build/bin/data
+          ${{ github.workspace }}/build/bin/aseprite*
