@@ -6,10 +6,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest]
-        build_type: [RelWithDebInfo]
-        ui: [gui]
-        scripting: [lua]
         # 旧配置 全版本编译
         # os: [windows-latest, macos-latest, ubuntu-latest]
         # build_type: [RelWithDebInfo, Debug]
@@ -22,6 +18,10 @@ jobs:
         #     ui: cli
         #   - build_type: RelWithDebInfo
         #     scripting: noscripts
+        os: [windows-latest]  # 仅编译windows版本
+        build_type: [Release] # 仅编译发布版本
+        ui: [gui]             # 仅编译图形用户界面版本
+        scripting: [lua]      # 仅编译启用Lua脚本支持版本
     steps:
     - uses: actions/checkout@v4
       with:
@@ -90,8 +90,7 @@ jobs:
           -DENABLE_CCACHE=$enable_ccache \
           -DLAF_BACKEND=$laf_backend \
           -DSKIA_DIR=$(realpath skia) \
-          -DSKIA_LIBRARY_DIR=$(realpath skia/out/Release-$skia_arch) \
-          -DOPENSSL_USE_STATIC_LIBS=ON
+          -DSKIA_LIBRARY_DIR=$(realpath skia/out/Release-$skia_arch)
     - name: Compiling
       shell: bash
       run: |
