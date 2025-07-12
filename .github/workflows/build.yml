@@ -19,7 +19,7 @@ jobs:
         #   - build_type: RelWithDebInfo
         #     scripting: noscripts
         os: [windows-latest]  # 仅编译windows版本
-        build_type: [Release] # 仅编译发布版本
+        build_type: [RelWithDebInfo] # 仅编译发布版本
         ui: [gui]             # 仅编译图形用户界面版本
         scripting: [lua]      # 仅编译启用Lua脚本支持版本
     steps:
