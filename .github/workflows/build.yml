@@ -90,7 +90,8 @@ jobs:
           -DENABLE_CCACHE=$enable_ccache \
           -DLAF_BACKEND=$laf_backend \
           -DSKIA_DIR=$(realpath skia) \
-          -DSKIA_LIBRARY_DIR=$(realpath skia/out/Release-$skia_arch)
+          -DSKIA_LIBRARY_DIR=$(realpath skia/out/Release-$skia_arch) \
+          -DOPENSSL_USE_STATIC_LIBS=ON
     - name: Compiling
       shell: bash
       run: |
