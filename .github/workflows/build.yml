@@ -1,26 +1,27 @@
-name: build
-on: [push, pull_request]
+name: build # 工作流名称
+on: [push, workflow_dispatch] # 代码推送到仓库时触发或手动触发
 jobs:
   build:
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        # os: [windows-latest, macos-latest, ubuntu-latest]
-        # build_type: [RelWithDebInfo, Debug]
-        # ui: [gui, cli]
-        # scripting: [lua, noscripts]
         os: [windows-latest]
         build_type: [RelWithDebInfo]
         ui: [gui]
         scripting: [lua]
-        exclude:
-          - build_type: Debug
-            ui: gui
-          - build_type: RelWithDebInfo
-            ui: cli
-          - build_type: RelWithDebInfo
-            scripting: noscripts
+        # 旧配置 全版本编译
+        # os: [windows-latest, macos-latest, ubuntu-latest]
+        # build_type: [RelWithDebInfo, Debug]
+        # ui: [gui, cli]
+        # scripting: [lua, noscripts]
+        # exclude:
+        #   - build_type: Debug
+        #     ui: gui
+        #   - build_type: RelWithDebInfo
+        #     ui: cli
+        #   - build_type: RelWithDebInfo
+        #     scripting: noscripts
     steps:
     - uses: actions/checkout@v4
       with:
@@ -84,16 +85,18 @@ jobs:
         cmake -S . -B build -G Ninja \
           -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
           -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9 \
-          -DENABLE_TESTS=ON \
+          -DENABLE_TESTS=OFF \ # 不启用测试支持
           -DENABLE_SCRIPTING=$enable_scripting \
           -DENABLE_CCACHE=$enable_ccache \
           -DLAF_BACKEND=$laf_backend \
           -DSKIA_DIR=$(realpath skia) \
-          -DSKIA_LIBRARY_DIR=$(realpath skia/out/Release-$skia_arch)
+          -DSKIA_LIBRARY_DIR=$(realpath skia/out/Release-$skia_arch) \
+          -DOPENSSL_USE_STATIC_LIBS=ON
     - name: Compiling
       shell: bash
       run: |
         cd build && ninja
+    # 旧配置 用于编译时调试测试
     # - name: Running C++ Tests
     #   shell: bash
     #   run: |
@@ -111,9 +114,10 @@ jobs:
     #     export ASEPRITE=$PWD/build/bin/aseprite
     #     cd tests
     #     $XVFB bash run-tests.sh
+    # 新增配置 提交后直接进行编译
     - uses: actions/upload-artifact@v4
       with:
-        name: aseprite-${{ runner.os }}-${{ matrix.ui }}-${{ matrix.scripting }}-${{ matrix.build_type }}
+        name: aseprite-${{ runner.os }}-${{ matrix.ui }}-${{ matrix.scripting }}-${{ matrix.build_type }} # 编译完成后的文件名称
         path: |
           ${{ github.workspace }}/build/bin/data
-          ${{ github.workspace }}/build/bin/aseprite*
+          ${{ github.workspace }}/build/bin/aseprite.exe
