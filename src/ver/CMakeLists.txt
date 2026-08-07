@@ -2,7 +2,7 @@
 # Copyright (C) 2020-present  Igara Studio S.A.
 
 # Aseprite version
-set(VERSION "1.x-dev")
+set(VERSION "1.3.18.1")
 
 option(UPDATE_VERSION_WITH_GIT "Update Aseprite version using Git commit" on)
 if(UPDATE_VERSION_WITH_GIT)

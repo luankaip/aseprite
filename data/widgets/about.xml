@@ -4,7 +4,11 @@
 <gui i18nwarnings="false">
 <window id="about" text="About Aseprite">
   <vbox>
-    <label text="" id="title" />
+    <hbox>
+      <label text="" id="title" />
+      <boxfiller />
+      <link text="BY LUANKAI" url="https://github.com/luankaip/aseprite/" />
+    </hbox>
     <label text="Animated sprite editor &amp;&amp; pixel art tool" />
     <link text="Authors &amp;&amp; Credits" url="" id="credits" />
     <link text="Translators" url="" id="i18n_credits" />
